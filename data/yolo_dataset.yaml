@@ -1,0 +1,21 @@
+# yolo_dataset.yaml — Ultralytics dataset configuration (template)
+#
+# IMPORTANT: The `path` field below is overwritten by the notebook (04_YOLOv8.ipynb Cell 5)
+# with the absolute Colab Drive path before training. Do NOT train directly from this
+# template — path resolution will fail if `path` points to a local relative directory.
+#
+# Ultralytics path resolution:
+#   train/val/test are resolved RELATIVE to `path` (not relative to this YAML file).
+#   Correct:  path=/content/drive/... + train=train/images → /content/drive/.../train/images
+#   Wrong:    path=data/ + train=data/.../train/images     → data/data/.../train/images (double prefix)
+
+path: /content/drive/MyDrive/aerial_detection/object_detection_Dataset
+
+train: train/images
+val:   valid/images
+test:  test/images
+
+nc: 2
+names:
+  0: bird
+  1: drone

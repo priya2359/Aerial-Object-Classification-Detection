@@ -1,0 +1,31 @@
+# FastAPI & Server
+fastapi==0.111.0
+uvicorn[standard]==0.30.0
+python-multipart==0.0.9
+
+# Inference dependencies
+tensorflow==2.15.0
+numpy==1.26.4
+Pillow==10.3.0
+opencv-python-headless==4.9.0.80
+
+# MLflow (model loading)
+mlflow==2.13.0
+
+# Redis Feature Store
+redis==5.0.4
+
+# Database logging
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.30
+
+# Prometheus metrics
+prometheus-client==0.20.0
+
+# Drift Detection
+evidently==0.4.30
+scipy==1.13.0
+
+# Utilities
+python-dotenv==1.0.1
+pyyaml==6.0.1

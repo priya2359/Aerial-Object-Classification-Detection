@@ -1,0 +1,28 @@
+# ─── Google Colab Requirements ────────────────────────────────
+# Colab already provides (DO NOT reinstall — wastes session time):
+#   tensorflow, torch (CUDA), numpy, pandas, matplotlib, seaborn,
+#   scikit-learn, scipy, Pillow, opencv, ipywidgets, jupyter
+#
+# Paste this at the top of every training notebook:
+#   !pip install -r requirements-colab.txt -q
+
+# YOLOv8
+ultralytics==8.2.0
+
+# Experiment tracking
+mlflow==2.13.0
+
+# Feature store client
+redis==5.0.4
+
+# Database
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.30
+
+# Drift detection
+evidently==0.4.30
+
+# Utilities
+python-dotenv==1.0.1
+tqdm==4.66.4
+pyyaml==6.0.1

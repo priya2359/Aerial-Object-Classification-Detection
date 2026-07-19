@@ -1,0 +1,45 @@
+# ─── Local environment (dev, API serving, Streamlit) ──────────
+# GPU training runs on Google Colab — see requirements-colab.txt
+# PyTorch not listed here; torch CPU pulled in by ultralytics if needed
+
+# Core ML & Deep Learning (TF for local inference only)
+tensorflow==2.15.0
+keras==2.15.0
+
+# Transfer Learning / EfficientNet included in tensorflow
+
+# Data & Preprocessing
+# Note: ultralytics moved to requirements-colab.txt — it pulls PyTorch CPU (~700 MB)
+# as a transitive dependency. YOLOv8 training is Colab-only; not needed locally.
+numpy==1.26.4
+pandas==2.2.2
+opencv-python==4.9.0.80
+Pillow==10.3.0
+scikit-learn==1.4.2
+
+# Visualization
+matplotlib==3.8.4
+seaborn==0.13.2
+
+# MLflow Experiment Tracking
+mlflow==2.13.0
+
+# Database
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.30
+
+# Redis Feature Store
+redis==5.0.4
+
+# Drift Detection
+evidently==0.4.30
+
+# Notebook support
+jupyter==1.0.0
+ipykernel==6.29.4
+ipywidgets==8.1.2
+
+# Utilities
+python-dotenv==1.0.1
+tqdm==4.66.4
+pyyaml==6.0.1

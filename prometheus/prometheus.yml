@@ -1,0 +1,30 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093   # service name — never localhost
+
+rule_files:
+  - /etc/prometheus/alert_rules.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: [localhost:9090]
+
+  - job_name: fastapi
+    static_configs:
+      - targets: [fastapi:8000]   # service name — never localhost
+    metrics_path: /metrics
+
+  - job_name: redis
+    static_configs:
+      - targets: [redis-exporter:9121]  # redis-exporter service
+
+  - job_name: postgres
+    static_configs:
+      - targets: [postgres-exporter:9187]

@@ -1,0 +1,11 @@
+# Streamlit UI
+streamlit==1.35.0
+requests==2.32.3
+
+# Visualization
+plotly==5.22.0
+pandas==2.2.2
+
+# Utilities
+python-dotenv==1.0.1
+Pillow==10.3.0

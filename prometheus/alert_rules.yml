@@ -1,0 +1,76 @@
+groups:
+  - name: aerial_detection_alerts
+    rules:
+
+      # CRITICAL — drone swarm scenario
+      - alert: HighDroneDetectionRate
+        expr: |
+          (
+            rate(aerial_predictions_total{predicted_class="drone"}[5m])
+            /
+            rate(aerial_predictions_total[5m])
+          ) > 0.80
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High drone detection rate (> 80%)"
+          description: "Over 80% of predictions in the last 5 minutes are drones. Possible drone swarm."
+
+      # WARNING — training/production data mismatch
+      - alert: DataDriftDetected
+        expr: aerial_data_drift_score > 0.3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Data drift score exceeded 0.3"
+          description: "KS drift score is {{ $value }}. Production data may differ from training distribution."
+
+      # WARNING — latency degradation
+      - alert: HighInferenceLatency
+        expr: histogram_quantile(0.95, rate(aerial_inference_duration_seconds_bucket[5m])) > 1
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 inference latency > 1 second"
+          description: "P95 latency is {{ $value }}s. Check server resources."
+
+      # CRITICAL — API health failure
+      - alert: APIDown
+        expr: up{job="fastapi"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "FastAPI service is down"
+          description: "The aerial detection API has been unreachable for more than 1 minute."
+
+      # WARNING — model confidence dropping
+      # M2 fix: aerial_prediction_confidence is a Histogram, not a Gauge.
+      # avg_over_time() on a Histogram computes average bucket counts (meaningless).
+      # Correct PromQL: weighted mean = _sum rate / _count rate.
+      - alert: LowModelConfidence
+        expr: >
+          (
+            sum(rate(aerial_prediction_confidence_sum[10m]))
+            /
+            sum(rate(aerial_prediction_confidence_count[10m]))
+          ) < 0.60
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Average model confidence below 60%"
+          description: "Model confidence has been below 60% for 10 minutes. Possible out-of-distribution inputs."
+
+      # WARNING — Redis feature store unreachable
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis feature store is down"
+          description: "Redis has been unreachable for 2 minutes. Feature store falling back to recomputation."

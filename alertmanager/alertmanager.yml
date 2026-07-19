@@ -1,0 +1,48 @@
+# AlertManager configuration — Aerial Detection System
+# Previously missing: AlertManager container had no config file mounted,
+# so all alerts (HighDroneDetectionRate, APIDown, DataDrift, etc.) were silently dropped.
+#
+# To configure real notifications:
+#   - Email: fill smtp_* fields and use email_configs in the receiver
+#   - Slack: add slack_configs with webhook_url
+#   - PagerDuty: add pagerduty_configs with service_key
+
+global:
+  resolve_timeout: 5m
+
+route:
+  # Default receiver for all alerts
+  receiver: "aerial-ops"
+
+  # Group alerts by severity so critical ones fire immediately
+  group_by: ["alertname", "severity"]
+  group_wait:      10s
+  group_interval:  5m
+  repeat_interval: 1h
+
+  routes:
+    # Critical alerts (APIDown, HighDroneDetectionRate) fire with minimal delay
+    - match:
+        severity: critical
+      receiver: "aerial-ops-critical"
+      group_wait:      5s
+      repeat_interval: 15m
+
+receivers:
+  - name: "aerial-ops"
+    webhook_configs:
+      - url: "http://localhost:5001/alerts"   # replace with your webhook endpoint
+        send_resolved: true
+
+  - name: "aerial-ops-critical"
+    webhook_configs:
+      - url: "http://localhost:5001/alerts/critical"   # replace with your webhook endpoint
+        send_resolved: true
+
+inhibit_rules:
+  # Suppress warning-level alerts when the API itself is down
+  - source_match:
+      alertname: APIDown
+    target_match_re:
+      severity: "warning"
+    equal: ["job"]

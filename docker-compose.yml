@@ -1,0 +1,236 @@
+version: "3.9"
+
+# ─── RULE: All services on aerial-network. NEVER use 'localhost' ───
+# between containers — always use the service name as the hostname.
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.9.1
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow_db
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    GOOGLE_APPLICATION_CREDENTIALS: /secrets/gcs-service-account.json
+    # PostgresHook connection — avoids per-task env var scatter
+    AIRFLOW_CONN_POSTGRES_AERIAL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    MODEL_VERSION: ${MODEL_VERSION:-v1}
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - airflow_logs:/opt/airflow/logs
+    # Mount GCS service account — Challenge 5 fix from memory
+    - ./secrets/gcs-service-account.json:/secrets/gcs-service-account.json:ro
+    # Dataset visible to Airflow worker for local ingestion
+    - ./data/classification_dataset:/opt/airflow/data/classification_dataset:ro
+  depends_on:
+    postgres:
+      condition: service_healthy
+  networks:
+    - aerial-network
+
+services:
+
+  # ─── PostgreSQL ───────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    # Challenge 10 fix: healthcheck so dependents wait for DB ready
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aerial-network
+
+  # ─── Redis Feature Store ──────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    # Challenge 4 fix: appendonly persistence so data survives restart
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aerial-network
+
+  # ─── MLflow Tracking Server ───────────────────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.13.0
+    command: >
+      mlflow server
+      --backend-store-uri postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
+    # Challenge 4 fix: mount artifact dir as volume with write permissions
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - aerial-network
+
+  # ─── FastAPI Inference Server ─────────────────────────────────
+  fastapi:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+    # Challenge 10 fix: wait for all dependencies to be healthy
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - aerial-network
+
+  # ─── Streamlit UI ─────────────────────────────────────────────
+  streamlit:
+    build:
+      context: ./streamlit_app
+      dockerfile: Dockerfile
+    env_file: .env
+    environment:
+      # Challenge 1 fix: use service name, not localhost
+      FASTAPI_URL: http://fastapi:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      fastapi:
+        condition: service_healthy
+    networks:
+      - aerial-network
+
+  # ─── Airflow Webserver ────────────────────────────────────────
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ─── Airflow Scheduler ────────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+
+  # ─── Prometheus ───────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+    ports:
+      - "9090:9090"
+    depends_on:
+      - fastapi
+    networks:
+      - aerial-network
+
+  # ─── Grafana ──────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.3
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - aerial-network
+
+  # ─── Redis Exporter (Prometheus scraping) ─────────────────────
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.61.0
+    environment:
+      # Challenge 1 fix: redis service name, not localhost
+      REDIS_ADDR: redis://redis:6379
+    ports:
+      - "9121:9121"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - aerial-network
+
+  # ─── PostgreSQL Exporter (M1 fix: was referenced in prometheus.yml but absent) ──
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable"
+    ports:
+      - "9187:9187"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - aerial-network
+
+  # ─── AlertManager ─────────────────────────────────────────────
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+    ports:
+      - "9093:9093"
+    networks:
+      - aerial-network
+
+# ─── Named Volumes (data survives container restarts) ─────────────
+volumes:
+  postgres_data:
+  redis_data:       # Challenge 4 fix: named volume for Redis persistence
+  mlflow_artifacts: # Challenge 4 fix: named volume for MLflow artifacts
+  grafana_data:
+  prometheus_data:
+  airflow_logs:
+
+# ─── Network ──────────────────────────────────────────────────────
+networks:
+  aerial-network:
+    driver: bridge
