@@ -1,0 +1,91 @@
+# Render Blueprint — deploy FastAPI + Streamlit + PostgreSQL to Render (render.com)
+# Free-tier plan: services spin down after 15 min idle; ~30s cold start on first request.
+#
+# Deploy steps:
+#   1. Push this repo to GitHub
+#   2. Go to render.com → New → Blueprint → select this repo
+#   3. Render reads this file and provisions all services automatically
+#   4. After deploy: visit the aerial-fastapi URL /health to warm it up, then open Streamlit
+
+services:
+
+  # ─── FastAPI Inference API ────────────────────────────────────
+  - type: web
+    name: aerial-fastapi
+    runtime: docker
+    dockerfilePath: ./api/Dockerfile   # Dockerfile is inside api/ but build context is repo root
+    dockerContext: .                   # repo root — Dockerfile copies api/, sql/, models/
+    plan: free
+    port: 8000
+    healthCheckPath: /health
+    envVars:
+      # PostgreSQL — auto-wired from the managed database below
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: aerial-postgres
+          property: host
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: aerial-postgres
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: aerial-postgres
+          property: password
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: aerial-postgres
+          property: database
+
+      # Core config
+      - key: MODEL_VERSION
+        value: v1
+      - key: DRONE_ALERT_THRESHOLD
+        value: "0.90"
+      - key: MAX_UPLOAD_SIZE_MB
+        value: "10"
+      - key: DRIFT_WARNING_THRESHOLD
+        value: "0.3"
+      - key: DRIFT_CRITICAL_THRESHOLD
+        value: "0.5"
+      - key: MODELS_DIR
+        value: models
+      - key: DATA_DIR
+        value: data
+
+      # Auto-generate a secure reload secret (accessible in Render dashboard)
+      - key: RELOAD_SECRET
+        generateValue: true
+
+      # Redis — optional; FastAPI degrades gracefully (embedding cache disabled) if unreachable.
+      # To enable: sign up at upstash.com/redis (free tier), then uncomment and fill in:
+      # - key: REDIS_HOST
+      #   value: <your-upstash-endpoint>
+      # - key: REDIS_PORT
+      #   value: "6379"
+      # - key: REDIS_PASSWORD
+      #   value: <your-upstash-password>
+
+  # ─── Streamlit UI ─────────────────────────────────────────────
+  - type: web
+    name: aerial-streamlit
+    runtime: docker
+    dockerfilePath: ./streamlit_app/Dockerfile
+    dockerContext: ./streamlit_app
+    plan: free
+    port: 8501
+    healthCheckPath: /
+    envVars:
+      # Point Streamlit at the FastAPI service — Render resolves this after deploy
+      - key: FASTAPI_URL
+        fromService:
+          name: aerial-fastapi
+          type: web
+          property: url
+
+# ─── Managed PostgreSQL ───────────────────────────────────────
+databases:
+  - name: aerial-postgres
+    databaseName: aerial_db
+    user: aerial_user
+    plan: free

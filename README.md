@@ -36,6 +36,24 @@ Drone detections with confidence ≥ 90% trigger a real-time security alert.
 
 ---
 
+## Cloud Deploy (Render — one-click)
+
+The fastest way to deploy the API + UI publicly:
+
+```bash
+# 1. Push this repo to GitHub (public or private)
+git push origin main
+
+# 2. Go to render.com → New → Blueprint → select your repo
+# Render reads render.yaml and provisions FastAPI + Streamlit + PostgreSQL automatically.
+# Free tier: services spin down after 15 min idle (~30s cold start on first request).
+```
+
+After deploy, visit `https://aerial-fastapi-<id>.onrender.com/health` once to warm it up,
+then open the Streamlit URL shown in your Render dashboard.
+
+---
+
 ## Quick Start (Docker Compose)
 
 ```bash
@@ -50,6 +68,9 @@ docker compose up -d
 # 3. Verify all services are healthy
 docker compose ps
 ```
+
+> **Note:** The FastAPI image now bundles a stub model (random ~0.5 confidence) for immediate
+> startup. To use real Colab-trained weights, copy `models/*.h5` here then `docker compose build fastapi`.
 
 Once all services show `running` or `healthy`:
 

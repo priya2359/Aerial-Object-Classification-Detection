@@ -184,6 +184,27 @@ def _connect_postgres() -> Optional[psycopg2.pool.ThreadedConnectionPool]:
         return None
 
 
+def _ensure_schema(pool: psycopg2.pool.ThreadedConnectionPool) -> None:
+    """Run sql/init.sql on startup — idempotent (all CREATE IF NOT EXISTS).
+
+    Cloud managed databases (e.g. Render PostgreSQL) don't auto-execute volume-mounted
+    init scripts, so schema creation must happen programmatically on first startup.
+    """
+    sql_path = Path("sql/init.sql")
+    if not sql_path.exists():
+        logger.warning("sql/init.sql not found — skipping schema initialisation")
+        return
+    try:
+        conn = pool.getconn()
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(sql_path.read_text())
+        pool.putconn(conn)
+        logger.info("Database schema verified/initialised via sql/init.sql")
+    except Exception as exc:
+        logger.error("Schema initialisation failed: %s", exc)
+
+
 # ── Application lifespan ──────────────────────────────────────────────────────
 
 @asynccontextmanager
@@ -200,6 +221,8 @@ async def lifespan(app: FastAPI):
 
     state.redis_client, state.redis_available = _connect_redis()
     state.db_pool = _connect_postgres()
+    if state.db_pool:
+        _ensure_schema(state.db_pool)
 
     # Drift detection: reference embeddings are always 1280-dim EfficientNetB0 space.
     # Only enabled when the winner's embedding_dim matches the reference.

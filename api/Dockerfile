@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for opencv
+# System dependencies for OpenCV
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libsm6 \
@@ -11,12 +11,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements-api.txt .
+# Install Python dependencies
+# Build context is repo root — requirements live inside api/
+COPY api/requirements-api.txt ./requirements-api.txt
 RUN pip install --no-cache-dir -r requirements-api.txt
 
-COPY . .
+# Copy api/ as a Python package — preserves `from api.xxx import …` import paths
+COPY api/ ./api/
+
+# Copy SQL schema — used by _ensure_schema() on startup for cloud DBs
+COPY sql/ ./sql/
+
+# Copy committed model metadata (production_model.txt, metrics JSON)
+# .h5 weights are gitignored; create_stub_model.py generates them at build time
+COPY models/ ./models/
+
+# Generate stub .h5 if no real trained model exists in the image
+RUN python api/create_stub_model.py
 
 EXPOSE 8000
 
-# Challenge 9 fix: model loads on startup event, not per request
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

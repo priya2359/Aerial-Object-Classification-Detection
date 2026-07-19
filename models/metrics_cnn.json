@@ -1,0 +1,21 @@
+{
+  "model_name": "custom_cnn",
+  "architecture": "Custom CNN 3-block (stub — replace with Colab-trained metrics)",
+  "metrics": {
+    "test_accuracy": 0.5,
+    "test_precision": 0.5,
+    "test_recall": 0.5,
+    "test_f1": 0.5,
+    "test_auc": 0.5,
+    "test_loss": null,
+    "accuracy": 0.5,
+    "precision": 0.5,
+    "recall": 0.5,
+    "f1": 0.5,
+    "auc_roc": 0.5
+  },
+  "optimal_threshold": {
+    "threshold": 0.5
+  },
+  "note": "Stub values — overwrite after running notebooks/02_CustomCNN.ipynb on Google Colab"
+}
