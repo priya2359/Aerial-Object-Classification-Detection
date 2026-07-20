@@ -41,16 +41,16 @@ Drone detections with confidence ≥ 90% trigger a real-time security alert.
 The fastest way to deploy the API + UI publicly:
 
 ```bash
-# 1. Push this repo to GitHub (public or private)
-git push origin main
+# Repo is already on GitHub at:
+# https://github.com/priya2359/Aerial-Object-Classification-Detection
 
-# 2. Go to render.com → New → Blueprint → select your repo
+# Go to render.com → New → Blueprint → connect GitHub → select this repo
 # Render reads render.yaml and provisions FastAPI + Streamlit + PostgreSQL automatically.
 # Free tier: services spin down after 15 min idle (~30s cold start on first request).
 ```
 
-After deploy, visit `https://aerial-fastapi-<id>.onrender.com/health` once to warm it up,
-then open the Streamlit URL shown in your Render dashboard.
+After deploy, visit your FastAPI service URL at `/health` once to warm it up,
+then open the Streamlit URL — both are shown in your Render dashboard.
 
 ---
 
@@ -58,8 +58,8 @@ then open the Streamlit URL shown in your Render dashboard.
 
 ```bash
 # 1. Clone and configure
-git clone https://github.com/<your-username>/aerial-detection-production.git
-cd aerial-detection-production
+git clone https://github.com/priya2359/Aerial-Object-Classification-Detection.git
+cd Aerial-Object-Classification-Detection
 cp .env.example .env        # edit POSTGRES_PASSWORD and MODEL_VERSION if needed
 
 # 2. Start all 11 services
