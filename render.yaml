@@ -74,12 +74,13 @@ services:
     plan: free
     healthCheckPath: /
     envVars:
-      # Point Streamlit at the FastAPI service — Render resolves this after deploy
-      - key: FASTAPI_URL
+      # Render injects the FastAPI hostname — Streamlit prepends https:// at runtime
+      # (property: url is not supported; host gives e.g. aerial-fastapi.onrender.com)
+      - key: FASTAPI_HOST
         fromService:
           name: aerial-fastapi
           type: web
-          property: url
+          property: host
 
 # ─── Managed PostgreSQL ───────────────────────────────────────
 databases:

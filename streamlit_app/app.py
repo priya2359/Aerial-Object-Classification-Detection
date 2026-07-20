@@ -13,9 +13,15 @@ import streamlit as st
 from components import analytics, batch_predictor, predictor
 
 # ── Config ────────────────────────────────────────────────────────────────────
-# In Docker: FASTAPI_URL=http://fastapi:8000 (service name, never localhost)
-# Local dev:  FASTAPI_URL=http://localhost:8000
-FASTAPI_URL = os.getenv("FASTAPI_URL", "http://fastapi:8000").rstrip("/")
+# Render sets FASTAPI_HOST (bare hostname, no protocol) via fromService reference.
+# Docker Compose sets FASTAPI_URL directly (http://fastapi:8000).
+# Local dev falls back to http://localhost:8000.
+_fastapi_host = os.getenv("FASTAPI_HOST", "")
+FASTAPI_URL = (
+    f"https://{_fastapi_host}"
+    if _fastapi_host
+    else os.getenv("FASTAPI_URL", "http://fastapi:8000")
+).rstrip("/")
 
 st.set_page_config(
     page_title="Aerial Object Detection",
