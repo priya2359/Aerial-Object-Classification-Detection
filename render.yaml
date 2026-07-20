@@ -16,7 +16,6 @@ services:
     dockerfilePath: ./api/Dockerfile   # Dockerfile is inside api/ but build context is repo root
     dockerContext: .                   # repo root — Dockerfile copies api/, sql/, models/
     plan: free
-    port: 8000
     healthCheckPath: /health
     envVars:
       # PostgreSQL — auto-wired from the managed database below
@@ -73,7 +72,6 @@ services:
     dockerfilePath: ./streamlit_app/Dockerfile
     dockerContext: ./streamlit_app
     plan: free
-    port: 8501
     healthCheckPath: /
     envVars:
       # Point Streamlit at the FastAPI service — Render resolves this after deploy
