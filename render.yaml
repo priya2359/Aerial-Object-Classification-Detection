@@ -36,6 +36,10 @@ services:
           name: aerial-postgres
           property: database
 
+      # Suppress TensorFlow C++ verbose logging (AVX/TRT warnings are harmless on CPU)
+      - key: TF_CPP_MIN_LOG_LEVEL
+        value: "2"
+
       # Core config
       - key: MODEL_VERSION
         value: v1
