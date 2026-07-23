@@ -1,6 +1,6 @@
 # filename: streamlit_app/app.py
 # purpose:  Main Streamlit entry point — sidebar health status + 3 prediction/analytics tabs
-# version:  1.0
+# version:  1.1
 
 # stdlib
 import os
@@ -30,6 +30,19 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+
+@st.cache_data(ttl=60)
+def _fetch_health(url: str) -> dict:
+    """Cached health check — TTL 60 s so a cold-start only blocks once per minute.
+    Timeout 25 s: Render free-tier cold start takes ~25-40 s; 5 s always times out.
+    """
+    try:
+        r = requests.get(f"{url}/health", timeout=25)
+        return r.json() if r.status_code == 200 else {}
+    except Exception:
+        return {}
+
+
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.title("🛸 Aerial Detection")
@@ -37,20 +50,23 @@ with st.sidebar:
 
     st.divider()
 
-    # Live health check
     st.subheader("API Status")
-    try:
-        health = requests.get(f"{FASTAPI_URL}/health", timeout=5).json()
-        api_ok = health.get("status") == "ok"
-    except Exception:
-        health = {}
-        api_ok = False
+
+    with st.spinner("Connecting to API…"):
+        health = _fetch_health(FASTAPI_URL)
+
+    api_ok = health.get("status") == "ok"
 
     if api_ok:
         st.success("FastAPI connected")
     else:
         st.error("FastAPI unreachable")
-        st.caption(f"Expected: `{FASTAPI_URL}`")
+        st.caption(f"URL: `{FASTAPI_URL}`")
+        st.caption("Free-tier services sleep after 15 min idle. "
+                   "If this is the first visit, wait 30 s and click **Refresh**.")
+        if st.button("Refresh", key="refresh_health"):
+            st.cache_data.clear()
+            st.rerun()
 
     if health:
         redis_ok = health.get("redis") == "connected"
